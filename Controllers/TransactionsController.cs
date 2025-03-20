@@ -166,7 +166,7 @@ namespace FinancialTransactionsManagementAPI.Controllers
 
             if (transaction.Amount <= 0)
             {
-                transaction.Status = TransactionStatus.Failed; 
+                transaction.Status = TransactionStatus.Failed;
                 failureReason = "The transaction amount must be greater than zero.";
             }
             else if (transaction.TransactionType == TransactionType.Debit)
@@ -174,21 +174,15 @@ namespace FinancialTransactionsManagementAPI.Controllers
                 decimal balance = await _repository.GetCustomerBalanceAsync(customer.CustomerId);
                 if (balance < transaction.Amount)
                 {
-                    transaction.Status = TransactionStatus.Failed; 
+                    transaction.Status = TransactionStatus.Failed;
                     failureReason = "Insufficient funds in the account.";
                 }
             }
 
-            // Nese transaksioni deshton kthen nje mesazh informues
-            if (transaction.Status == TransactionStatus.Failed)
-            {
-                return BadRequest(new { message = "Transaction failed", reason = failureReason });
-            }
-
-            // Ruan transaksionin
+            // Ruaj transaksionin në database edhe nëse është failed
             var createdTransaction = await _repository.CreateTransactionAsync(transaction);
 
-            // Kthen transaksionin e krijuar si DTO
+            // Krijo DTO për transaksionin
             var createdTransactionDto = new TransactionDto
             {
                 TransactionId = createdTransaction.TransactionId,
@@ -206,6 +200,17 @@ namespace FinancialTransactionsManagementAPI.Controllers
                     Email = customer.Email
                 }
             };
+
+            // Nëse transaksioni ka dështuar, kthe një përgjigje me mesazhin e gabimit, por transaksioni është ruajtur
+            if (transaction.Status == TransactionStatus.Failed)
+            {
+                return BadRequest(new
+                {
+                    message = "Transaction failed",
+                    reason = failureReason,
+                    transaction = createdTransactionDto // Kthe edhe transaksionin e ruajtur
+                });
+            }
 
             return CreatedAtAction(nameof(GetTransactionById), new { id = createdTransaction.TransactionId },
                   new { message = "Transaction created successfully", transaction = createdTransactionDto });
